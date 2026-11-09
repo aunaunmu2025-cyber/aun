@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة المحولات الكهربائية</title>
+    <!-- خط Tajawal للعربية -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        tajawal: ['Tajawal', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Tajawal', sans-serif; font-size: 1.125rem; }
+        
+        /* إعدادات الطباعة */
+        @media print {
+            @page {
+                size: 297mm 210mm;
+                margin: 0mm;
+            }
+            .no-print { display: none !important; }
+            body { 
+                background: white !important; 
+                color: black !important; 
+                width: 100vw !important;
+                height: 100vh !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            .print-white { 
+                background: white !important; 
+                color: black !important; 
+                border: none !important; 
+                box-shadow: none !important; 
+                padding: 0 !important;
+                margin: 0 !important;
+                width: 100% !important;
+            }
+            .print-header-title {
+                display: block !important;
+                text-align: center;
+                font-size: 22px !important;
+                font-weight: 900 !important;
+                margin-bottom: 8px;
+                color: black !important;
+            }
+            
+            .print-container, .admin-sub-tab, #adminPanel, main {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 2mm !important;
+            }
+            table { 
+                width: 100% !important; 
+                border-collapse: collapse !important; 
+                table-layout: auto !important; 
+            }
+            tr { 
+                page-break-inside: avoid; 
+            }
+            th, td { 
+                font-size: 9.5px !important; 
+                font-weight: bold !important; 
+                color: black !important; 
+                border: 1px solid #000 !important; 
+                padding: 5px 3px !important;
+                text-align: center !important;
+                word-wrap: break-word !important;
+            }
+            th { background-color: #e2e8f0 !important; }
+        }
+        .print-header-title { display: none; }
+    </style>
+
+    <!-- تهيئة Firebase Realtime Database -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // إعدادات Firebase الخاصة بمشروعك
+        const firebaseConfig = {
+            apiKey: "AIzaSyC6ROnB36eXd2fIAJdRrWWnfShcnizYiHw",
+            authDomain: "aunmuh-11b3c.firebaseapp.com",
+            databaseURL: "https://aunmuh-11b3c-default-rtdb.firebaseio.com",
+            projectId: "aunmuh-11b3c",
+            storageBucket: "aunmuh-11b3c.firebasestorage.app",
+            messagingSenderId: "150451065896",
+            appId: "1:150451065896:web:8a7b5227e5c2a62662911d",
+            measurementId: "G-S3W2WVG585"
+        };
+
+        // تهيئة التطبيق
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // إتاحة الكائنات عالمياً للربط مع دوال النظام
+        window.FB = { db, ref, set, get, child };
+
+        // جلب البيانات فور تحميل الصفحة
+        window.addEventListener('DOMContentLoaded', () => {
+            if (window.loadDataFromFirebase) {
+                window.loadDataFromFirebase();
+            }
+        });
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+    <!-- شريط التنقل العلوي -->
+    <header class="bg-slate-900 border-b border-slate-800 shadow-lg sticky top-0 z-50 no-print">
+        <div class="container mx-auto px-4 py-3.5 flex justify-between items-center">
+            <div class="flex items-center gap-2.5">
+                <span class="bg-blue-600 text-white p-2 rounded-xl text-xl">⚡</span>
+                <h1 class="text-base sm:text-xl font-black tracking-wide">إدارة المحولات الكهربائية</h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <div id="connectionStatus" class="hidden sm:block text-xs bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 text-emerald-400 font-bold">
+                    ● متصل بـ Firebase
+                </div>
+                <button onclick="openAdminGate()" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 transition-colors flex items-center gap-1.5 text-sm font-bold shadow-md" title="لوحة الإدارة">
+                    <span>🔐</span> <span class="hidden sm:inline">الإدارة</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- المحتوى الرئيسي -->
+    <main id="mainContainer" class="container mx-auto px-3 sm:px-4 py-4 flex-grow max-w-4xl transition-all duration-300">
+        
+        <!-- ================= 1. واجهة الإدخال ================= -->
+        <div id="tab-input" class="tab-content">
+            <div class="bg-slate-900 rounded-3xl shadow-xl border border-slate-800 p-4 sm:p-6">
+                <div class="mb-5 border-b border-slate-800 pb-3 flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-black text-white">إدخال بيانات المحولة</h2>
+                        <p class="text-xs sm:text-sm text-slate-400 mt-0.5">اختر المحطة أولاً لتظهر لك المغذيات التابعة لها في القائمة.</p>
+                    </div>
+                    <div id="successAlert" class="hidden px-4 py-2 bg-emerald-950 text-emerald-400 border border-emerald-900 rounded-xl font-bold text-sm animate-bounce">
+                        ✨ تم حفظ البيانات في Firebase بنجاح!
+                    </div>
+                </div>
+
+                <form id="transformerForm" onsubmit="handleFormSubmit(event)" class="space-y-4">
+                    <input type="hidden" id="editId">
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-bold mb-1.5 text-slate-200">اسم المحطة *</label>
+                            <select id="stationName" onchange="updateFeedersDropdown()" required class="w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-700 text-white text-base focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <option value="">جاري تحميل المحطات...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold mb-1.5 text-slate-200">اسم المغذي *</label>
+                            <select id="feederName" required class="w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-700 text-white text-base focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <option value="">اختر المحطة أولاً لعرض المغذيات...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold mb-1.5 text-slate-200">حالة المحولة *</label>
+                            <select id="transformerStatus" onchange="toggleStatusFields()" class="w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-700 text-white text-base focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <option value="جديدة">جديدة</option>
+                                <option value="معطوبة">معطوبة</option>
+                                <option value="استبدال">استبدال</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="p-3.5 sm:p-4 bg-slate-950/60 rounded-2xl border border-slate-800 space-y-4">
+                        <h3 class="font-bold text-blue-400 text-sm sm:text-base border-b border-slate-800 pb-2">التفاصيل الفنية</h3>
+                        
+                        <div class="space-y-3.5">
+                            <div>
+                                <label class="block text-xs font-bold mb-1 text-slate-300">رقم المحولة</label>
+                                <input type="text" id="transNumber" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm">
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-xs font-bold mb-1 text-slate-300">تاريخ/سنة الصنع</label>
+                                    <input type="text" id="manufactureDate" class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm" placeholder="2023">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold mb-1 text-slate-300">بلد المنشأ</label>
+                                    <input type="text" id="originCountry" class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm" placeholder="المنشأ">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold mb-1 text-slate-300">حجم المحولة (KVA)</label>
+                                <input type="text" id="transSize" class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm" placeholder="مثال: 400 KVA">
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-xs font-bold mb-1 text-slate-300">قواطع ضغط عالي (ض.ع)</label>
+                                    <select id="hvBreaker" class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm">
+                                        <option value="موجود">موجود</option>
+                                        <option value="غير موجود">غير موجود</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold mb-1 text-slate-300">قواطع ضغط واطي (ض.و)</label>
+                                    <select id="lvBreaker" class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm">
+                                        <option value="موجود">موجود</option>
+                                        <option value="غير موجود">غير موجود</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold mb-1 text-slate-300">عدد المشتركين</label>
+                                <input type="number" id="subscribersCount" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold mb-1 text-slate-300">أقرب نقطة دالة</label>
+                                <input type="text" id="landmark" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold mb-1 text-slate-300">قرب المواطن</label>
+                                <input type="text" id="nearCitizen" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm" placeholder="اسم أو عنوان المواطن القريب">
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-xs font-bold mb-1 text-slate-300">الإحداثي X</label>
+                                    <input type="text" id="coordX" class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-center text-sm" placeholder="خط العرض X">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold mb-1 text-slate-300">الإحداثي Y</label>
+                                    <input type="text" id="coordY" class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-center text-sm" placeholder="خط الطول Y">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="replacementSection" class="p-3.5 sm:p-4 bg-blue-950/40 rounded-2xl border border-blue-900/50 space-y-3 hidden">
+                        <h3 class="font-bold text-blue-400 text-sm sm:text-base border-b border-blue-900/50 pb-2">معلومات المحولة الجديدة (البديلة)</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-bold mb-1 text-slate-200">رقم المحولة الجديدة</label>
+                                <input type="text" id="newTransNumber" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold mb-1 text-slate-200">حجم المحولة الجديدة</label>
+                                <input type="text" id="newTransSize" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm">
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-xs font-bold mb-1 text-slate-200">سنة الصنع الجديدة</label>
+                                    <input type="text" id="newManufactureYear" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold mb-1 text-slate-200">بلد المنشأ الجديد</label>
+                                    <input type="text" id="newOriginCountry" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-2.5 pt-2">
+                        <button type="submit" id="submitBtn" class="w-full py-3.5 rounded-xl bg-blue-600 text-white font-black hover:bg-blue-500 shadow-lg shadow-blue-600/30 text-base">حفظ وإرسال المعلومات</button>
+                        <button type="button" onclick="resetForm()" class="w-full py-3 rounded-xl border border-slate-700 text-slate-300 font-bold hover:bg-slate-800 text-sm">إلغاء وتفريغ الحقول</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- ================= 2. تبويب الإدارة ================= -->
+        <div id="tab-admin" class="tab-content hidden">
+            
+            <div id="authGate" class="max-w-md mx-auto bg-slate-900 p-6 sm:p-8 rounded-3xl shadow-xl border border-slate-800 text-center my-8">
+                <div class="w-16 h-16 bg-blue-950 text-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl font-bold border border-blue-900">🔐</div>
+                <h3 class="text-xl font-black text-white mb-2">منطقة الإدارة المحمية</h3>
+                <p class="text-sm text-slate-400 mb-6">يرجى إدخال رمز المرور للوصول (رمز الدخول: <span class="text-blue-400 font-bold">1111</span>)</p>
+                <form onsubmit="verifyPin(event)" class="space-y-4">
+                    <input type="password" id="pinInput" maxlength="4" placeholder="••••" required class="w-full text-center tracking-widest text-3xl py-3 rounded-2xl bg-slate-950 border border-slate-700 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <div class="flex gap-2">
+                        <button type="button" onclick="backToInput()" class="w-1/2 py-3 bg-slate-800 text-slate-300 rounded-2xl font-bold">إلغاء</button>
+                        <button type="submit" class="w-1/2 py-3 bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-500 shadow-lg shadow-blue-600/30">دخول</button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="adminPanel" class="hidden space-y-4">
+                
+                <div class="flex justify-between items-center bg-slate-900 p-3.5 rounded-2xl border border-slate-800 gap-2 no-print">
+                    <div class="flex items-center gap-2 text-xs sm:text-sm">
+                        <span class="w-3 h-3 bg-emerald-500 rounded-full animate-ping"></span>
+                        <span class="font-bold text-slate-200">صلاحيات الإدارة مفعلة</span>
+                    </div>
+                    <button onclick="lockAdmin()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-xs">إغلاق لوحة الإدارة 🔒</button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 bg-slate-900 p-2 rounded-2xl border border-slate-800 no-print">
+                    <button onclick="switchAdminSubTab('records')" id="subBtn-records" class="py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm bg-blue-600 text-white transition-all">📋 سجل الإدخالات</button>
+                    <button onclick="switchAdminSubTab('control')" id="subBtn-control" class="py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-300 transition-all">⚙️ لوحة التحكم (المحطات والمغذيات)</button>
+                </div>
+
+                <!-- فرع 1: سجل الإدخالات -->
+                <div id="adminSubTab-records" class="admin-sub-tab space-y-4 print-container">
+                    <div class="bg-slate-900 rounded-3xl border border-slate-800 p-4 sm:p-6 print-white w-full">
+                        
+                        <div class="print-header-title">سجل المحولات الكهربائية</div>
+
+                        <div class="flex flex-col gap-3 mb-5 pb-4 border-b border-slate-800 no-print">
+                            <h3 class="text-xl font-black text-white">سجل الإدخالات والتقارير</h3>
+                            
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                                <select id="filterStation" onchange="filterRecords()" class="px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm">
+                                    <option value="">كل المحطات</option>
+                                </select>
+                                <select id="filterFeeder" onchange="filterRecords()" class="px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm">
+                                    <option value="">كل المغذيات</option>
+                                </select>
+                                <select id="filterStatus" onchange="filterRecords()" class="px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm">
+                                    <option value="">كل الحالات</option>
+                                    <option value="جديدة">جديدة</option>
+                                    <option value="معطوبة">معطوبة</option>
+                                    <option value="استبدال">استبدال</option>
+                                </select>
+                                <input type="date" id="filterDate" onchange="filterRecords()" class="px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm">
+                            </div>
+
+                            <div class="flex gap-2">
+                                <button onclick="resetFilters()" class="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold">إلغاء الفلاتر</button>
+                                <button onclick="window.print()" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20">🖨️ طباعة السجل بالكامل (A4 أفقي)</button>
+                            </div>
+                        </div>
+
+                        <div class="w-full overflow-x-auto">
+                            <table id="recordsTable" class="w-full text-right border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-950 text-slate-300 text-xs border-b border-slate-800">
+                                        <th class="p-1.5 font-bold">التاريخ</th>
+                                        <th class="p-1.5 font-bold">اسم المحطة</th>
+                                        <th class="p-1.5 font-bold">اسم المغذي</th>
+                                        <th class="p-1.5 font-bold">الحالة</th>
+                                        <th class="p-1.5 font-bold">رقم المحولة</th>
+                                        <th class="p-1.5 font-bold">بلد المنشأ</th>
+                                        <th class="p-1.5 font-bold">تاريخ الصنع</th>
+                                        <th class="p-1.5 font-bold">الحجم</th>
+                                        <th class="p-1.5 font-bold">المشتركين</th>
+                                        <th class="p-1.5 font-bold">ض.ع</th>
+                                        <th class="p-1.5 font-bold">ض.و</th>
+                                        <th class="p-1.5 font-bold">الإحداثي X</th>
+                                        <th class="p-1.5 font-bold">الإحداثي Y</th>
+                                        <th class="p-1.5 font-bold">نقطة دالة</th>
+                                        <th class="p-1.5 font-bold">قرب المواطن</th>
+                                        <th class="p-1.5 font-bold text-center no-print">الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recordsTableBody" class="divide-y divide-slate-800 text-xs"></tbody>
+                            </table>
+                        </div>
+                        <div id="emptyState" class="hidden text-center py-10 text-slate-500 text-base font-bold">لا توجد سجلات مطابقة.</div>
+                    </div>
+                </div>
+
+                <!-- فرع 2: لوحة التحكم -->
+                <div id="adminSubTab-control" class="admin-sub-tab hidden space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="bg-slate-900 rounded-3xl border border-slate-800 p-5 space-y-4">
+                            <h3 class="text-base font-black text-emerald-400 border-b border-slate-800 pb-2">🏢 إدارة أسماء المحطات (الأصل)</h3>
+                            <form onsubmit="addStationManual(event)" class="flex gap-2">
+                                <input type="text" id="newManualStation" placeholder="اسم المحطة الجديدة..." required class="flex-1 px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm">
+                                <button type="submit" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm">إضافة</button>
+                            </form>
+                            <div class="space-y-2 max-h-48 overflow-y-auto" id="manualStationsList"></div>
+                        </div>
+
+                        <div class="bg-slate-900 rounded-3xl border border-slate-800 p-5 space-y-4">
+                            <h3 class="text-base font-black text-blue-400 border-b border-slate-800 pb-2">⚡ ربط المغذيات بالمحطات</h3>
+                            <form onsubmit="addFeederManual(event)" class="space-y-3">
+                                <select id="stationParentSelect" required class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm">
+                                    <option value="">اختر المحطة الأصل...</option>
+                                </select>
+                                <div class="flex gap-2">
+                                    <input type="text" id="newManualFeeder" placeholder="اسم المغذي التابع..." required class="flex-1 px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm">
+                                    <button type="submit" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm">ربط وإضافة</button>
+                                </div>
+                            </form>
+                            <div class="space-y-2 max-h-48 overflow-y-auto" id="manualFeedersList"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- نافذة منبثقة للتفاصيل -->
+    <div id="detailsModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-lg font-black text-white">تفاصيل السجل الكاملة</h3>
+                <button onclick="closeDetailsModal()" class="text-slate-400 hover:text-white font-bold text-xl">✕</button>
+            </div>
+            <div id="modalContent" class="space-y-2.5 text-sm max-h-96 overflow-y-auto pr-1"></div>
+            <div class="flex gap-2 pt-2">
+                <button onclick="printSingleRecord()" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm">🖨️ طباعة هذا السجل</button>
+                <button onclick="closeDetailsModal()" class="py-2.5 px-5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-sm">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- التذييل -->
+    <footer class="bg-slate-900 border-t border-slate-800 py-3 mt-auto text-center text-xs text-slate-400 no-print">
+        جميع الحقوق محفوظة &copy; 2026 - نظام إدارة المحولات
+    </footer>
+
+    <!-- سكريبت إدارة البيانات والتطبيقات المدمجة -->
+    <script>
+        let transformers = [];
+        let manualStations = ['محطة الأمل', 'محطة النور'];
+        let manualFeeders = [
+            { name: 'مغذي الرئيسي 1', station: 'محطة الأمل' },
+            { name: 'مغذي الشمالي', station: 'محطة النور' }
+        ];
+        let currentModalRecordId = null;
+
+        // --- دوال الربط بقاعدة بيانات Firebase ---
+        async function loadDataFromFirebase() {
+            if (!window.FB) return;
+            const { db, ref, get, child } = window.FB;
+            const dbRef = ref(db);
+
+            try {
+                // جلب المحولات
+                const transSnapshot = await get(child(dbRef, 'transformers'));
+                if (transSnapshot.exists()) {
+                    const data = transSnapshot.val();
+                    transformers = Array.isArray(data) ? data : Object.values(data);
+                }
+
+                // جلب المحطات
+                const stationsSnapshot = await get(child(dbRef, 'manualStations'));
+                if (stationsSnapshot.exists()) {
+                    const data = stationsSnapshot.val();
+                    manualStations = Array.isArray(data) ? data : Object.values(data);
+                }
+
+                // جلب المغذيات
+                const feedersSnapshot = await get(child(dbRef, 'manualFeeders'));
+                if (feedersSnapshot.exists()) {
+                    const data = feedersSnapshot.val();
+                    manualFeeders = Array.isArray(data) ? data : Object.values(data);
+                }
+
+                // تحديث العناصر في الواجهة
+                populateStationsDropdown();
+                toggleStatusFields();
+                if (document.getElementById('adminPanel') && !document.getElementById('adminPanel').classList.contains('hidden')) {
+                    renderTable(transformers);
+                    renderManualLists();
+                    populateStationParentDropdown();
+                }
+            } catch (error) {
+                console.error("خطأ عند تحميل البيانات من Firebase:", error);
+            }
+        }
+
+        function saveTransformersToFirebase() {
+            if (!window.FB) return;
+            const { db, ref, set } = window.FB;
+            set(ref(db, 'transformers'), transformers);
+        }
+
+        function saveStationsToFirebase() {
+            if (!window.FB) return;
+            const { db, ref, set } = window.FB;
+            set(ref(db, 'manualStations'), manualStations);
+        }
+
+        function saveFeedersToFirebase() {
+            if (!window.FB) return;
+            const { db, ref, set } = window.FB;
+            set(ref(db, 'manualFeeders'), manualFeeders);
+        }
+
+        // --- دوال التحكم بالواجهة والتفاعلات ---
+        function populateStationsDropdown() {
+            const stationSelect = document.getElementById('stationName');
+            if (!stationSelect) return;
+            stationSelect.innerHTML = '<option value="">اختر المحطة...</option>';
+            manualStations.forEach(s => {
+                stationSelect.innerHTML += `<option value="${s}">${s}</option>`;
+            });
+            document.getElementById('feederName').innerHTML = '<option value="">اختر المحطة أولاً لعرض المغذيات...</option>';
+        }
+
+        function updateFeedersDropdown() {
+            const selectedStation = document.getElementById('stationName').value;
+            const feederSelect = document.getElementById('feederName');
+            
+            feederSelect.innerHTML = '<option value="">اختر المغذي التابع للمحطة...</option>';
+            if (!selectedStation) return;
+
+            const filteredFeeders = manualFeeders.filter(f => f.station === selectedStation);
+            filteredFeeders.forEach(f => {
+                feederSelect.innerHTML += `<option value="${f.name}">${f.name}</option>`;
+            });
+        }
+
+        function populateFilterDropdowns() {
+            const fStation = document.getElementById('filterStation');
+            const fFeeder = document.getElementById('filterFeeder');
+            if(!fStation || !fFeeder) return;
+
+            fStation.innerHTML = '<option value="">كل المحطات</option>';
+            manualStations.forEach(s => {
+                fStation.innerHTML += `<option value="${s}">${s}</option>`;
+            });
+
+            fFeeder.innerHTML = '<option value="">كل المغذيات</option>';
+            manualFeeders.forEach(f => {
+                fFeeder.innerHTML += `<option value="${f.name}">${f.name}</option>`;
+            });
+        }
+
+        function openAdminGate() {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById('tab-admin').classList.remove('hidden');
+            document.getElementById('authGate').classList.remove('hidden');
+            document.getElementById('adminPanel').classList.add('hidden');
+            document.getElementById('pinInput').value = '';
+            document.getElementById('mainContainer').classList.remove('max-w-4xl');
+            document.getElementById('mainContainer').classList.add('w-full', 'px-1');
+        }
+
+        function backToInput() {
+            document.getElementById('tab-admin').classList.add('hidden');
+            document.getElementById('tab-input').classList.remove('hidden');
+            document.getElementById('mainContainer').classList.remove('w-full', 'px-1');
+            document.getElementById('mainContainer').classList.add('max-w-4xl');
+            populateStationsDropdown();
+        }
+
+        function switchAdminSubTab(subTabName) {
+            document.querySelectorAll('.admin-sub-tab').forEach(el => el.classList.add('hidden'));
+            document.getElementById('subBtn-records').className = "py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-300 transition-all";
+            document.getElementById('subBtn-control').className = "py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-300 transition-all";
+
+            if (subTabName === 'records') {
+                document.getElementById('adminSubTab-records').classList.remove('hidden');
+                document.getElementById('subBtn-records').className = "py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm bg-blue-600 text-white transition-all";
+            } else if (subTabName === 'control') {
+                document.getElementById('adminSubTab-control').classList.remove('hidden');
+                document.getElementById('subBtn-control').className = "py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm bg-blue-600 text-white transition-all";
+                renderManualLists();
+                populateStationParentDropdown();
+            }
+        }
+
+        function verifyPin(e) {
+            e.preventDefault();
+            const pin = document.getElementById('pinInput').value;
+            if (pin === '1111') {
+                document.getElementById('authGate').classList.add('hidden');
+                document.getElementById('adminPanel').classList.remove('hidden');
+                populateFilterDropdowns();
+                renderTable(transformers);
+                renderManualLists();
+                populateStationParentDropdown();
+            } else {
+                alert('رمز المرور غير صحيح! (الرمز هو 1111)');
+                document.getElementById('pinInput').value = '';
+            }
+        }
+
+        function lockAdmin() {
+            backToInput();
+        }
+
+        function toggleStatusFields() {
+            const statusElem = document.getElementById('transformerStatus');
+            if(!statusElem) return;
+            const status = statusElem.value;
+            const replacementSection = document.getElementById('replacementSection');
+            if (status === 'استبدال') {
+                replacementSection.classList.remove('hidden');
+            } else {
+                replacementSection.classList.add('hidden');
+            }
+        }
+
+        function addStationManual(e) {
+            e.preventDefault();
+            const val = document.getElementById('newManualStation').value.trim();
+            if(val && !manualStations.includes(val)) {
+                manualStations.push(val);
+                saveStationsToFirebase();
+                document.getElementById('newManualStation').value = '';
+                renderManualLists();
+                populateStationParentDropdown();
+                alert('تمت إضافة المحطة بنجاح');
+            }
+        }
+
+        function deleteStationManual(name) {
+            manualStations = manualStations.filter(s => s !== name);
+            manualFeeders = manualFeeders.filter(f => f.station !== name);
+            saveStationsToFirebase();
+            saveFeedersToFirebase();
+            renderManualLists();
+            populateStationParentDropdown();
+        }
+
+        function addFeederManual(e) {
+            e.preventDefault();
+            const station = document.getElementById('stationParentSelect').value;
+            const feederName = document.getElementById('newManualFeeder').value.trim();
+
+            if (!station) {
+                alert('يرجى اختيار المحطة الأصل أولاً!');
+                return;
+            }
+
+            if(feederName && !manualFeeders.some(f => f.name === feederName && f.station === station)) {
+                manualFeeders.push({ name: feederName, station: station });
+                saveFeedersToFirebase();
+                document.getElementById('newManualFeeder').value = '';
+                renderManualLists();
+                alert('تم ربط المغذي بالمحطة بنجاح');
+            }
+        }
+
+        function deleteFeederManual(index) {
+            manualFeeders.splice(index, 1);
+            saveFeedersToFirebase();
+            renderManualLists();
+        }
+
+        function populateStationParentDropdown() {
+            const select = document.getElementById('stationParentSelect');
+            if(!select) return;
+            select.innerHTML = '<option value="">اختر المحطة الأصل...</option>';
+            manualStations.forEach(s => {
+                select.innerHTML += `<option value="${s}">${s}</option>`;
+            });
+        }
+
+        function renderManualLists() {
+            const sList = document.getElementById('manualStationsList');
+            if(!sList) return;
+            sList.innerHTML = '';
+            manualStations.forEach(s => {
+                sList.innerHTML += `<div class="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-sm">
+                    <span>🏢 ${s}</span>
+                    <button onclick="deleteStationManual('${s}')" class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-950/40 rounded border border-red-900/50">حذف</button>
+                </div>`;
+            });
+
+            const fList = document.getElementById('manualFeedersList');
+            if(!fList) return;
+            fList.innerHTML = '';
+            manualFeeders.forEach((f, index) => {
+                fList.innerHTML += `<div class="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-sm">
+                    <div>
+                        <div class="font-bold text-blue-400">⚡ ${f.name}</div>
+                        <div class="text-xs text-slate-400">تابعة للمحطة: ${f.station}</div>
+                    </div>
+                    <button onclick="deleteFeederManual(${index})" class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-950/40 rounded border border-red-900/50">حذف</button>
+                </div>`;
+            });
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const editId = document.getElementById('editId').value;
+            
+            const record = {
+                id: editId ? Number(editId) : Date.now(),
+                date: editId ? transformers.find(t => t.id == editId).date : new Date().toISOString().split('T')[0],
+                stationName: document.getElementById('stationName').value,
+                feederName: document.getElementById('feederName').value,
+                status: document.getElementById('transformerStatus').value,
+                transNumber: document.getElementById('transNumber').value,
+                originCountry: document.getElementById('originCountry').value,
+                manufactureDate: document.getElementById('manufactureDate').value,
+                transSize: document.getElementById('transSize').value,
+                subscribersCount: document.getElementById('subscribersCount').value,
+                hvBreaker: document.getElementById('hvBreaker').value,
+                lvBreaker: document.getElementById('lvBreaker').value,
+                coordX: document.getElementById('coordX').value,
+                coordY: document.getElementById('coordY').value,
+                landmark: document.getElementById('landmark').value,
+                nearCitizen: document.getElementById('nearCitizen').value,
+                newTransNumber: document.getElementById('newTransNumber').value,
+                newTransSize: document.getElementById('newTransSize').value,
+                newManufactureYear: document.getElementById('newManufactureYear').value,
+                newOriginCountry: document.getElementById('newOriginCountry').value
+            };
+
+            if (editId) {
+                const index = transformers.findIndex(t => t.id == editId);
+                if (index !== -1) transformers[index] = record;
+                alert('تم تحديث السجل بنجاح في قاعدة البيانات!');
+            } else {
+                transformers.unshift(record);
+                const alertBox = document.getElementById('successAlert');
+                if(alertBox) {
+                    alertBox.classList.remove('hidden');
+                    setTimeout(() => alertBox.classList.add('hidden'), 4000);
+                }
+            }
+
+            saveTransformersToFirebase();
+            resetForm();
+        }
+
+        function resetForm() {
+            document.getElementById('transformerForm').reset();
+            document.getElementById('editId').value = '';
+            document.getElementById('submitBtn').innerText = 'حفظ وإرسال المعلومات';
+            toggleStatusFields();
+            populateStationsDropdown();
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('recordsTableBody');
+            const emptyState = document.getElementById('emptyState');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (!data || data.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            data.forEach(item => {
+                let statusBadge = item.status;
+                if (item.status === 'استبدال' && item.newTransNumber) {
+                    statusBadge += ` (بديلة)`;
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-950/50 transition-colors";
+                tr.innerHTML = `
+                    <td class="p-1 text-slate-300 text-xs">${item.date}</td>
+                    <td class="p-1 font-bold text-white text-xs">${item.stationName || '-'}</td>
+                    <td class="p-1 text-emerald-400 font-bold text-xs">${item.feederName || '-'}</td>
+                    <td class="p-1"><span class="px-1 py-0.5 rounded text-[10px] font-black bg-slate-800 text-slate-200 border border-slate-700">${statusBadge}</span></td>
+                    <td class="p-1 text-slate-300 text-xs">${item.transNumber || '-'}</td>
+                    <td class="p-1 text-slate-300 text-xs">${item.originCountry || '-'}</td>
+                    <td class="p-1 text-slate-300 text-xs">${item.manufactureDate || '-'}</td>
+                    <td class="p-1 text-slate-300 text-xs">${item.transSize || '-'}</td>
+                    <td class="p-1 text-slate-300 text-xs">${item.subscribersCount || '-'}</td>
+                    <td class="p-1 text-slate-300 text-xs">${item.hvBreaker || '-'}</td>
+                    <td class="p-1 text-slate-300 text-xs">${item.lvBreaker || '-'}</td>
+                    <td class="p-1 text-slate-300 text-xs">${item.coordX || '-'}</td>
+                    <td class="p-1 text-slate-300 text-xs">${item.coordY || '-'}</td>
+                    <td class="p-1 text-slate-300 text-xs">${item.landmark || '-'}</td>
+                    <td class="p-1 text-slate-300 text-xs">${item.nearCitizen || '-'}</td>
+                    <td class="p-1 text-center no-print whitespace-nowrap space-x-0.5 space-x-reverse">
+                        <button onclick="showDetails(${item.id})" class="p-1 bg-emerald-950 text-emerald-400 border border-emerald-900 rounded hover:bg-emerald-900 text-xs" title="تفاصيل">👁️</button>
+                        <button onclick="editRecord(${item.id})" class="p-1 bg-blue-950 text-blue-400 border border-blue-900 rounded hover:bg-blue-900 text-xs" title="تعديل">✏️</button>
+                        <button onclick="printRow(${item.id})" class="p-1 bg-amber-950 text-amber-400 border border-amber-900 rounded hover:bg-amber-900 text-xs" title="طباعة">🖨️</button>
+                        <button onclick="deleteRecord(${item.id})" class="p-1 bg-red-950 text-red-400 border border-red-900 rounded hover:bg-red-900 text-xs" title="حذف">🗑️</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function showDetails(id) {
+            const item = transformers.find(t => t.id === id);
+            if (!item) return;
+            currentModalRecordId = id;
+
+            let content = `
+                <div><strong>تاريخ الإدخال:</strong> ${item.date}</div>
+                <div><strong>اسم المحطة:</strong> ${item.stationName}</div>
+                <div><strong>اسم المغذي:</strong> ${item.feederName}</div>
+                <div><strong>حالة المحولة:</strong> ${item.status}</div>
+                <div><strong>رقم المحولة:</strong> ${item.transNumber || '-'}</div>
+                <div><strong>بلد المنشأ:</strong> ${item.originCountry || '-'}</div>
+                <div><strong>تاريخ/سنة الصنع:</strong> ${item.manufactureDate || '-'}</div>
+                <div><strong>حجم المحولة:</strong> ${item.transSize || '-'}</div>
+                <div><strong>عدد المشتركين:</strong> ${item.subscribersCount || '-'}</div>
+                <div><strong>قواطع ضغط عالي (ض.ع):</strong> ${item.hvBreaker || '-'}</div>
+                <div><strong>قواطع ضغط واطي (ض.و):</strong> ${item.lvBreaker || '-'}</div>
+                <div><strong>الإحداثي X:</strong> ${item.coordX || '-'}</div>
+                <div><strong>الإحداثي Y:</strong> ${item.coordY || '-'}</div>
+                <div><strong>أقرب نقطة دالة:</strong> ${item.landmark || '-'}</div>
+                <div><strong>قرب المواطن:</strong> ${item.nearCitizen || '-'}</div>
+            `;
+
+            if (item.status === 'استبدال') {
+                content += `
+                    <hr class="border-slate-800 my-2">
+                    <div class="text-blue-400 font-bold">معلومات المحولة البديلة:</div>
+                    <div><strong>رقم الجديدة:</strong> ${item.newTransNumber || '-'}</div>
+                    <div><strong>حجم الجديدة:</strong> ${item.newTransSize || '-'}</div>
+                    <div><strong>سنة صنع الجديدة:</strong> ${item.newManufactureYear || '-'}</div>
+                    <div><strong>بلد منشأ الجديدة:</strong> ${item.newOriginCountry || '-'}</div>
+                `;
+            }
+
+            if (item.coordX && item.coordY) {
+                content += `<div class="pt-2"><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.coordX + ',' + item.coordY)}" target="_blank" class="text-blue-400 underline font-bold">📍 فتح الموقع على خريطة جوجل</a></div>`;
+            }
+
+            document.getElementById('modalContent').innerHTML = content;
+            document.getElementById('detailsModal').classList.remove('hidden');
+        }
+
+        function closeDetailsModal() {
+            document.getElementById('detailsModal').classList.add('hidden');
+            currentModalRecordId = null;
+        }
+
+        function printSingleRecord() {
+            if (!currentModalRecordId) return;
+            const rows = document.querySelectorAll('#recordsTableBody tr');
+            rows.forEach(row => {
+                if(!row.innerHTML.includes(`showDetails(${currentModalRecordId})`)) {
+                    row.style.display = 'none';
+                }
+            });
+            window.print();
+            rows.forEach(row => row.style.display = '');
+        }
+
+        function printRow(id) {
+            currentModalRecordId = id;
+            printSingleRecord();
+        }
+
+        function filterRecords() {
+            const sFilter = document.getElementById('filterStation').value;
+            const fFilter = document.getElementById('filterFeeder').value;
+            const stFilter = document.getElementById('filterStatus').value;
+            const dFilter = document.getElementById('filterDate').value;
+
+            let filtered = transformers;
+            if (sFilter) filtered = filtered.filter(t => t.stationName === sFilter);
+            if (fFilter) filtered = filtered.filter(t => t.feederName === fFilter);
+            if (stFilter) filtered = filtered.filter(t => t.status === stFilter);
+            if (dFilter) filtered = filtered.filter(t => t.date === dFilter);
+
+            renderTable(filtered);
+        }
+
+        function resetFilters() {
+            document.getElementById('filterStation').value = '';
+            document.getElementById('filterFeeder').value = '';
+            document.getElementById('filterStatus').value = '';
+            document.getElementById('filterDate').value = '';
+            renderTable(transformers);
+        }
+
+        function editRecord(id) {
+            const item = transformers.find(t => t.id === id);
+            if (!item) return;
+
+            document.getElementById('tab-admin').classList.add('hidden');
+            document.getElementById('tab-input').classList.remove('hidden');
+            document.getElementById('mainContainer').classList.remove('w-full', 'px-1');
+            document.getElementById('mainContainer').classList.add('max-w-4xl');
+            
+            populateStationsDropdown();
+
+            document.getElementById('editId').value = item.id;
+            document.getElementById('stationName').value = item.stationName;
+            updateFeedersDropdown();
+            document.getElementById('feederName').value = item.feederName;
+
+            document.getElementById('transformerStatus').value = item.status;
+            toggleStatusFields();
+
+            document.getElementById('transNumber').value = item.transNumber || '';
+            document.getElementById('manufactureDate').value = item.manufactureDate || '';
+            document.getElementById('originCountry').value = item.originCountry || '';
+            document.getElementById('transSize').value = item.transSize || '';
+            document.getElementById('hvBreaker').value = item.hvBreaker || 'موجود';
+            document.getElementById('lvBreaker').value = item.lvBreaker || 'موجود';
+            document.getElementById('subscribersCount').value = item.subscribersCount || '';
+            document.getElementById('landmark').value = item.landmark || '';
+            document.getElementById('nearCitizen').value = item.nearCitizen || '';
+            document.getElementById('coordX').value = item.coordX || '';
+            document.getElementById('coordY').value = item.coordY || '';
+
+            if (item.status === 'استبدال') {
+                document.getElementById('newTransNumber').value = item.newTransNumber || '';
+                document.getElementById('newTransSize').value = item.newTransSize || '';
+                document.getElementById('newManufactureYear').value = item.newManufactureYear || '';
+                document.getElementById('newOriginCountry').value = item.newOriginCountry || '';
+            }
+
+            document.getElementById('submitBtn').innerText = 'تحديث البيانات';
+        }
+
+        function deleteRecord(id) {
+            if (confirm('هل أنت متأكد من حذف هذا السجل نهائياً؟')) {
+                transformers = transformers.filter(t => t.id !== id);
+                saveTransformersToFirebase();
+                renderTable(transformers);
+            }
+        }
+    </script>
+</body>
+</html>
